@@ -1,0 +1,533 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Festival Operations Engine</title>
+<style>
+:root{color-scheme:light dark;
+--bg:light-dark(#f2f5fa,#090e1b);--panel:light-dark(#ffffff,#111a2e);--panel2:light-dark(#f6f8fc,#16213a);
+--ink:light-dark(#0f1a33,#eef2fb);--muted:light-dark(#5d6c8d,#93a3c4);--line:light-dark(#e1e7f1,#243250);
+--accent:#6a5cf0;--accent-soft:light-dark(#efecff,#262150);--track:light-dark(#e4e9f4,#25334f);
+--ok:#12a77d;--watch:#e8922c;--over:#e5484d;--critical:#b3202f;--closed:#7b8699;--info:#1fa5c0;
+--shadow:0 10px 30px light-dark(rgba(20,35,70,.07),rgba(0,0,0,.35));--radius:16px}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font:inherit;color:inherit}button{cursor:pointer}
+.app{max-width:1520px;margin:auto;padding:24px 28px 40px}
+.topbar{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:22px}
+.brand{display:flex;align-items:center;gap:13px}
+.logo{width:44px;height:44px;border-radius:13px;background:linear-gradient(135deg,#7a6bff,#2fbcd6);display:grid;place-items:center;color:#fff;box-shadow:0 8px 20px #6a5cf040}
+.logo svg{width:24px}
+.eyebrow{text-transform:uppercase;letter-spacing:.12em;font-size:10px;font-weight:800;color:var(--muted)}
+h1{font-size:21px;letter-spacing:-.03em;margin:2px 0 0}
+.top-right{display:flex;align-items:center;gap:10px}
+.pill{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);padding:7px 12px;border-radius:999px;color:var(--muted);font-size:12px;background:var(--panel)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 4px color-mix(in srgb,var(--ok) 22%,transparent)}
+.icon-btn{border:1px solid var(--line);background:var(--panel);border-radius:999px;width:36px;height:36px;display:grid;place-items:center;font-size:15px}
+.hero{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;margin-bottom:18px;flex-wrap:wrap}
+.hero h2{font-size:30px;line-height:1.12;letter-spacing:-.04em;margin:6px 0 8px}
+.hero p{margin:0;color:var(--muted);max-width:660px;font-size:13.5px}
+.select{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 14px;min-width:250px;outline:none}
+.select:focus,.json:focus{border-color:var(--accent)}
+
+/* control bar: every column shares the same four rows so labels, sliders and ticks line up */
+.controls{display:grid;grid-template-columns:minmax(200px,auto) minmax(300px,1.5fr) minmax(250px,1fr) auto;column-gap:30px;align-items:start;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px 24px;margin-bottom:14px}
+.ctl{display:grid;grid-template-rows:34px 34px 16px minmax(34px,auto);row-gap:2px;align-content:start;min-width:0}
+.ctl+.ctl{border-left:1px solid var(--line);padding-left:30px}
+.ctl-h{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.ctl-h label{font-size:12px;font-weight:700}
+.ctl-m{display:flex;align-items:center}
+.ctl-m input[type=range]{margin:0}
+.ctl-t{display:flex;justify-content:space-between;font-size:10px;color:var(--muted);line-height:16px}
+.ctl-f{padding-top:8px;font-size:11.5px;color:var(--muted)}
+.seg{display:inline-flex;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:4px;gap:3px}
+.seg button{border:0;background:transparent;border-radius:9px;padding:8px 15px;font-weight:700;font-size:13px;color:var(--muted)}
+.seg button.active{background:var(--accent);color:#fff;box-shadow:0 4px 12px #6a5cf045}
+.ctl-val{font-size:22px;font-weight:800;letter-spacing:-.03em;color:var(--accent);font-variant-numeric:tabular-nums;line-height:1}
+.ctl-val small{font-size:12px;color:var(--muted);font-weight:600;margin-left:5px;letter-spacing:0}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:var(--panel2);border-radius:999px;padding:4px 10px;font-size:11px;font-weight:700;color:var(--muted)}
+.chip:hover,.chip.on{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+.btn{border:1px solid var(--line);background:var(--panel2);border-radius:10px;padding:9px 14px;font-size:12px;font-weight:700}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:linear-gradient(135deg,#7a6bff,#5b78f2);border-color:transparent;color:#fff}
+.btn.danger{color:var(--over)}
+
+/* banner */
+.banner{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;border-radius:var(--radius);padding:14px 20px;margin-bottom:14px;border:1px solid color-mix(in srgb,var(--c) 40%,var(--line));background:color-mix(in srgb,var(--c) 10%,var(--panel))}
+.banner .b-main{display:flex;gap:13px;align-items:center}
+.banner .b-ic{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;background:var(--c);color:#fff;font-weight:900;font-size:18px}
+.banner .b-t{font-weight:800;font-size:15px;letter-spacing:-.01em}
+.banner .b-d{color:var(--muted);font-size:12.5px;margin-top:1px}
+.banner .b-chips{display:flex;gap:8px;flex-wrap:wrap}
+.status-chip{display:inline-flex;gap:6px;align-items:center;padding:6px 11px;border-radius:999px;font-size:12px;font-weight:700;background:var(--panel);border:1px solid var(--line)}
+.status-chip i{width:8px;height:8px;border-radius:50%;background:var(--c)}
+.s-ok{--c:var(--ok)}.s-watch{--c:var(--watch)}.s-over{--c:var(--over)}.s-critical{--c:var(--critical)}.s-closed{--c:var(--closed)}.s-info{--c:var(--info)}
+
+/* metrics */
+.metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:14px}
+.metric{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow);border-top:3px solid var(--c,var(--accent))}
+.metric .m-l{font-size:12px;color:var(--muted);font-weight:700}
+.metric .m-v{font-size:30px;font-weight:800;letter-spacing:-.045em;margin:6px 0 2px;font-variant-numeric:tabular-nums}
+.metric .m-v small{font-size:14px;color:var(--muted);font-weight:700;letter-spacing:0}
+.metric .m-f{font-size:11.5px;color:var(--muted)}
+.metric .m-f b{color:var(--c)}
+
+/* panels */
+.grid{display:grid;grid-template-columns:minmax(0,1.75fr) minmax(310px,.8fr);gap:14px;align-items:start;margin-bottom:14px}
+.stack{display:grid;gap:14px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+.p-head{padding:15px 18px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.p-title{font-weight:800;font-size:15px;letter-spacing:-.01em}
+.p-sub{font-size:12px;color:var(--muted);margin-top:2px}
+.p-body{padding:16px 18px}
+.map-wrap{background:light-dark(#f4f7fd,#0c1527);border-bottom:1px solid var(--line)}
+svg.network{display:block;width:100%;height:auto}
+.legend{display:flex;gap:16px;flex-wrap:wrap;padding:11px 18px;font-size:11.5px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:10px;height:10px;border-radius:50%;background:var(--c)}
+.legend i.bar{width:18px;height:3px;border-radius:2px;background:var(--accent)}
+.legend i.dash{width:18px;height:0;border-top:3px dashed var(--info);background:none;border-radius:0}
+
+/* svg */
+:root{--mapbg:light-dark(#f4f7fd,#0c1527)}
+.map-wrap{background:var(--mapbg)}
+.edge{stroke:light-dark(#c3cfe5,#34456a);stroke-width:2.6;stroke-linecap:round}
+.edge.blocked{stroke-dasharray:2 9;opacity:.5}
+.flow{stroke:var(--accent);stroke-linecap:round;stroke-dasharray:9 7;animation:dashF 1.2s linear infinite;fill:none}
+.flow.evac{stroke:var(--closed);stroke-dasharray:none;animation:none;opacity:.8}
+.truckroute{stroke-width:3.4;stroke-dasharray:4 7;stroke-linecap:round;stroke-linejoin:round;fill:none;animation:dashT 1.6s linear infinite}
+.pillbg{fill:var(--mapbg);stroke-width:1.6}
+.pilltxt{font-size:12px;font-weight:800;text-anchor:middle}
+.node{cursor:pointer;outline:none}
+.node .mask{fill:var(--mapbg)}
+.node .track{fill:none;stroke:var(--track);stroke-width:9}
+.node .after{fill:none;stroke:var(--c);stroke-width:9;stroke-linecap:round}
+.node .tick{stroke:var(--ink);stroke-width:2.4}
+.node .core{fill:var(--panel)}
+.node .pct{fill:var(--ink);font-size:15px;font-weight:800;text-anchor:middle}
+.node .nm,.node .sub{text-anchor:middle;paint-order:stroke;stroke:var(--mapbg);stroke-width:5px;stroke-linejoin:round}
+.node .nm{fill:var(--ink);font-size:14px;font-weight:800}
+.node .sub{fill:var(--muted);font-size:12px;font-weight:600}
+.node .sel{fill:none;stroke:var(--accent);stroke-width:2;stroke-dasharray:4 4}
+.node:hover .core,.node:focus .core{fill:var(--accent-soft)}
+.node .badge{fill:var(--c)}.badge-t{fill:#fff;font-size:11px;font-weight:900;text-anchor:middle}
+.legend i.grey{background:var(--closed)}
+.fleet-t{border:1px solid var(--line);border-radius:12px;background:var(--panel2);padding:10px 12px;margin-bottom:9px}
+.fleet-t:last-child{margin-bottom:0}
+.fleet-h{display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:6px}
+.fleet-h i{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;color:#fff;font-size:11px;font-weight:900;font-style:normal}
+.leg{display:grid;grid-template-columns:48px 1fr auto auto;gap:8px;align-items:center;font-size:12px;padding:4px 0;border-top:1px solid var(--line)}
+@keyframes dashF{to{stroke-dashoffset:-16}}
+@keyframes dashT{to{stroke-dashoffset:-22}}
+@media(prefers-reduced-motion:reduce){.flow,.truckroute{animation:none}}
+
+/* side cards */
+.kv{display:grid;grid-template-columns:1fr auto;gap:7px 12px;font-size:13px}
+.kv span{color:var(--muted)}.kv b{text-align:right;font-variant-numeric:tabular-nums}
+.badge{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:800;color:var(--c);background:color-mix(in srgb,var(--c) 14%,transparent)}
+.hint{color:var(--muted);font-size:12.5px;margin:0 0 10px}
+.hot{display:flex;justify-content:space-between;align-items:center;width:100%;border:1px solid var(--line);background:var(--panel2);border-radius:10px;padding:9px 12px;margin-top:7px;text-align:left}
+.hot:hover{border-color:var(--accent)}
+.note{font-size:11.5px;color:var(--muted);line-height:1.55;margin-top:12px}
+.meter{height:9px;border-radius:99px;background:var(--track);position:relative;overflow:visible;margin:6px 0}
+.meter .fill{height:100%;border-radius:99px;background:var(--c)}
+.meter .thr{position:absolute;top:-3px;width:2px;height:15px;background:var(--ink);border-radius:1px}
+
+/* tables */
+.tabs{display:inline-flex;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:3px;gap:2px}
+.tabs button{border:0;background:transparent;border-radius:7px;padding:6px 11px;font-size:12px;font-weight:700;color:var(--muted)}
+.tabs button.active{background:var(--panel);color:var(--ink);box-shadow:0 1px 4px #0002}
+.tbl-wrap{overflow:auto}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;padding:10px 14px;background:var(--panel2);color:var(--muted);font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;font-weight:800;white-space:nowrap}
+td{padding:11px 14px;border-top:1px solid var(--line);font-size:12.5px;vertical-align:middle}
+tbody tr.row:hover{background:var(--panel2)}
+tr.sel{background:var(--accent-soft)}
+.type{display:inline-flex;padding:4px 9px;border-radius:7px;font-size:11px;font-weight:800;color:var(--c);background:color-mix(in srgb,var(--c) 14%,transparent);white-space:nowrap}
+.code{font:700 11px ui-monospace,SFMono-Regular,Consolas,monospace;background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:3px 6px}
+.muted{color:var(--muted)}.nowrap{white-space:nowrap}
+.mini{width:110px}
+.empty{padding:26px;text-align:center;color:var(--muted)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+.json{width:100%;min-height:230px;resize:vertical;border:1px solid var(--line);border-radius:10px;background:light-dark(#f8faff,#0c1424);padding:12px;font:12px/1.55 ui-monospace,SFMono-Regular,Consolas,monospace;outline:none}
+.row-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.footer{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;color:var(--muted);font-size:11px;margin-top:8px}
+.toast{position:fixed;right:22px;bottom:22px;background:#172136;color:#fff;padding:11px 16px;border-radius:11px;box-shadow:0 12px 30px #0004;font-size:12.5px;opacity:0;transform:translateY(8px);pointer-events:none;transition:.2s;z-index:9}
+.toast.show{opacity:1;transform:none}
+@media(max-width:1150px){.grid{grid-template-columns:1fr}.controls{grid-template-columns:1fr 1fr;row-gap:20px}.ctl+.ctl{border-left:0;padding-left:0}.metrics{grid-template-columns:repeat(2,1fr)}.two{grid-template-columns:1fr}}
+@media(max-width:680px){.app{padding:14px}.controls{grid-template-columns:1fr}.hero h2{font-size:24px}.select{width:100%;min-width:0}.metric .m-v{font-size:25px}.topbar{flex-wrap:wrap}}
+</style>
+</head>
+<body>
+<div class="app">
+
+<header class="topbar">
+  <div class="brand">
+    <div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17 9 7l4 7 3-5 4 8"/><circle cx="4" cy="17" r="1.4" fill="currentColor"/><circle cx="9" cy="7" r="1.4" fill="currentColor"/><circle cx="13" cy="14" r="1.4" fill="currentColor"/><circle cx="16" cy="9" r="1.4" fill="currentColor"/><circle cx="20" cy="17" r="1.4" fill="currentColor"/></svg></div>
+    <div><div class="eyebrow">Short Circuits · EVA 01 / PS 01</div><h1>Festival Operations Engine</h1></div>
+  </div>
+  <div class="top-right">
+    <span class="pill">✦ Simulation · illustrative data</span>
+    <span class="pill"><span class="dot"></span> Engine online</span>
+    <button class="btn" id="logoutBtn">Sign out</button>
+    <button class="icon-btn" id="themeBtn" title="Toggle light / dark" aria-label="Toggle theme">◐</button>
+  </div>
+</header>
+
+<section class="hero">
+  <div>
+    <div class="eyebrow">Command centre · Mumbai</div>
+    <h2>See pressure. Reroute crowds.<br>Coordinate cleanup.</h2>
+    <p>Submit a crowd report or close a location, and the server recalculates crowd movement toward each crowd's destination, volunteer deployment and waste-truck dispatch. Every number on screen comes from one consistent model.</p>
+  </div>
+  <select id="profileSelect" class="select" aria-label="Choose layout profile">
+    <option value="default">Lalbaug → Girgaon corridor</option>
+    <option value="compact">Compact demonstration profile</option>
+    <option value="custom" hidden>Custom profile</option>
+  </select>
+</section>
+
+<section class="controls" aria-label="Scenario controls">
+  <div class="ctl">
+    <div class="ctl-h"><span class="eyebrow">View</span></div>
+    <div class="ctl-m"><div class="seg" role="tablist"><button id="vCrowd" class="active">Crowd flow</button><button id="vWaste">Waste</button></div></div>
+    <div class="ctl-t"></div>
+    <div class="ctl-f">Switch between crowd routing and waste collection.</div>
+  </div>
+  <div class="ctl">
+    <div class="ctl-h"><label for="repNode">Report crowd</label><span class="ctl-val" id="repAge"><small>using baseline</small></span></div>
+    <div class="ctl-m" style="gap:8px"><select id="repNode" class="select" style="min-width:0;flex:1"></select><input id="repCount" class="select" type="number" min="0" step="100" placeholder="people" style="min-width:0;width:100px"><button class="btn primary" id="repBtn">Report</button></div>
+    <div class="ctl-t"></div>
+    <div class="ctl-f chips"><button class="chip" id="simBtn">Demo: simulate field reports</button><button class="chip" id="clearRep">Clear reports</button></div>
+  </div>
+  <div class="ctl">
+    <div class="ctl-h"><label for="thr">Safe limit</label><span class="ctl-val"><span id="thrVal">85%</span><small>of capacity</small></span></div>
+    <div class="ctl-m"><input id="thr" type="range" min="50" max="100" step="1" value="85"></div>
+    <div class="ctl-t"><span>50% strict</span><span>100% full</span></div>
+    <div class="ctl-f">A location above this share starts sending people elsewhere.</div>
+  </div>
+  <div class="ctl">
+    <div class="ctl-h"><span class="eyebrow">Scenario</span></div>
+    <div class="ctl-m"><button class="btn danger" id="resetBtn">↺ Reset scenario</button></div>
+    <div class="ctl-t"></div>
+    <div class="ctl-f">Reopens all sites.</div>
+  </div>
+</section>
+
+<section class="banner s-ok" id="banner"></section>
+<section class="metrics" id="metrics"></section>
+
+<div class="grid">
+  <section class="panel">
+    <div class="p-head">
+      <div><div class="p-title" id="mapTitle"></div><div class="p-sub" id="mapSub"></div></div>
+      <span class="muted" style="font-size:12px" id="mapStatus"></span>
+    </div>
+    <div class="map-wrap"><svg class="network" id="network" viewBox="0 0 950 580" role="img" aria-label="Interactive festival corridor network"></svg></div>
+    <div class="legend" id="legend"></div>
+  </section>
+  <aside class="stack">
+    <section class="panel"><div class="p-head"><div><div class="p-title">Selected location</div><div class="p-sub">Click a node on the map or a row below</div></div></div><div class="p-body" id="detail"></div></section>
+    <section class="panel"><div class="p-head"><div><div class="p-title">Truck plan</div><div class="p-sub">Each truck's stops in order</div></div></div><div class="p-body" id="fleet"></div></section>
+    <section class="panel"><div class="p-head"><div><div class="p-title">Network headroom</div><div class="p-sub">Can the corridor absorb this crowd?</div></div></div><div class="p-body" id="headroom"></div></section>
+  </aside>
+</div>
+
+<section class="panel" style="margin-bottom:14px">
+  <div class="p-head">
+    <div><div class="p-title">Operational directives</div><div class="p-sub" id="dirSub">Generated from the current scenario</div></div>
+    <div class="tabs" id="dirTabs"><button data-f="all">All</button><button data-f="crowd" class="active">Crowd</button><button data-f="waste">Waste</button></div>
+  </div>
+  <div class="tbl-wrap"><table><thead><tr><th>#</th><th>Type</th><th>Location</th><th>Action</th><th>Route / timing</th><th>Ward</th><th>Status</th></tr></thead><tbody id="dirRows"></tbody></table></div>
+</section>
+
+<section class="panel" style="margin-bottom:14px">
+  <div class="p-head"><div><div class="p-title">Volunteer deployment</div><div class="p-sub" id="volSub"></div></div></div>
+  <div class="tbl-wrap"><table><thead><tr><th>Location</th><th>Police (have / need)</th><th>Medics</th><th>Crowd control</th><th>Status</th></tr></thead><tbody id="volRows"></tbody></table></div>
+</section>
+
+<section class="panel" style="margin-bottom:14px">
+  <div class="p-head"><div><div class="p-title">All locations</div><div class="p-sub">Before and after the recommended plan · click a row to inspect, or close / reopen a location</div></div></div>
+  <div class="tbl-wrap"><table><thead><tr><th>Location</th><th>Crowd now</th><th>After plan</th><th>Load vs safe limit</th><th>Status</th><th>Bins filled</th><th>Bins full in</th><th></th></tr></thead><tbody id="locRows"></tbody></table></div>
+</section>
+
+<div class="two">
+  <section class="panel"><div class="p-head"><div><div class="p-title">Dispatch payload</div><div class="p-sub">Machine-readable output for field systems</div></div></div><div class="p-body"><textarea class="json" id="outJson" readonly spellcheck="false" aria-label="Generated JSON"></textarea><div class="row-actions"><button class="btn primary" id="copyJson">Copy JSON</button><button class="btn" id="dlJson">Export .json</button></div></div></section>
+  <section class="panel"><div class="p-head"><div><div class="p-title">Profile editor</div><div class="p-sub">Change nodes, links, bins or trucks and apply</div></div></div><div class="p-body"><textarea class="json" id="profJson" spellcheck="false" aria-label="Editable profile JSON"></textarea><div class="row-actions"><button class="btn primary" id="applyProf">Apply profile</button><button class="btn" id="restoreProf">Restore default</button></div>
+  <div class="note">Required: <code>name, threshold, wasteK, decayHours, nodes, edges, trucks</code>. Optional: <code>edgeCapFactor</code> (link throughput as a share of the smaller end's capacity, default 0.5), <code>travelMin</code> (minutes per hop, default 8), <code>serviceMin</code> (minutes to empty a bin set, default 10), and a third number on any edge to set its throughput directly.</div></div></section>
+</div>
+
+<section class="panel" style="margin-bottom:14px">
+  <div class="p-head"><div><div class="p-title">Prototype scope</div><div class="p-sub">What is built and running today vs. what is planned</div></div></div>
+  <div class="p-body two" style="margin-bottom:0">
+    <div><span class="badge s-ok">Implemented in this prototype</span>
+      <ul class="note" style="padding-left:18px;margin-top:10px"><li>Hosted server runs the engine; official sign-in with session cookie</li><li>Crowd reports per location (typed in) trigger a full recalculation</li><li>Rerouting keeps each crowd heading to its destination (Lalbaug, then Girgaon): staging and onward moves only, never away from the goal</li><li>Volunteer deployment (police, medics, crowd control) by pressure, with shortfall shown</li><li>Closing a location, link throughput limits, escalation when nothing safe is left</li><li>Bin fill, time-to-full and truck dispatch; editable JSON profile; JSON export</li></ul></div>
+    <div><span class="badge s-info">Future scope (not built)</span>
+      <ul class="note" style="padding-left:18px;margin-top:10px"><li>Automatic counts from sensors, CCTV or ticketing (reports are typed today)</li><li>Individual volunteer accounts, rosters and live locations; per-role logins</li><li>Database, audit log and multi-user live updates</li><li>Crowd forecasting from past festival data and per-crowd destination mix</li><li>Globally optimal routing (min-cost max-flow) and real travel times</li><li>Release timing for held crowds; alerts pushed to field staff</li></ul></div>
+  </div>
+</section>
+
+<footer class="footer"><span><b>FOE · Prototype interface</b> · Team SHORT CIRCUITS</span><span>Sample data only. Not affiliated with or connected to BMC systems.</span></footer>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+/* ======================= DATA ======================= */
+const DEFAULT_PROFILE={name:"Lalbaug to Girgaon Ganpati corridor",threshold:.85,wasteK:.06,decayHours:3,edgeCapFactor:.5,travelMin:8,serviceMin:10,
+nodes:[
+{id:"DD",goal:"LB",name:"Dadar TT",ward:"G/North",cap:14000,crowd:8800,dwell:30,bins:6,binKg:240,fill:35,x:620,y:70},
+{id:"PR",goal:"LB",name:"Parel",ward:"F/South",cap:9000,crowd:5200,dwell:25,bins:4,binKg:240,fill:38,x:330,y:140},
+{id:"LB",goal:"GC",name:"Lalbaug",ward:"F/South",cap:12000,crowd:12600,dwell:45,bins:5,binKg:240,fill:52,x:600,y:260},
+{id:"WL",goal:"GC",name:"Worli",ward:"G/South",cap:8000,crowd:3100,dwell:20,bins:4,binKg:240,fill:22,x:100,y:230},
+{id:"BR",goal:"LB",name:"Byculla",ward:"E",cap:8500,crowd:4200,dwell:28,bins:4,binKg:240,fill:41,x:830,y:350},
+{id:"GR",goal:"GC",name:"Grant Road",ward:"D",cap:7000,crowd:3000,dwell:22,bins:3,binKg:240,fill:30,x:570,y:460},
+{id:"GC",goal:"GC",name:"Girgaon Chowpatty",ward:"D",cap:16000,crowd:13800,dwell:50,bins:7,binKg:240,fill:48,x:270,y:440}],
+edges:[["DD","PR"],["DD","LB"],["PR","LB"],["PR","WL"],["LB","BR"],["LB","GR"],["GR","BR"],["GR","GC"],["WL","GC"],["PR","GC"]],
+trucks:[{id:"SWM-07",at:"PR"},{id:"SWM-12",at:"BR"},{id:"SWM-15",at:"WL"}],
+volunteers:{police:110,medic:45,crowd_control:100}};
+const COMPACT_PROFILE={...DEFAULT_PROFILE,name:"Compact festival corridor demo",nodes:DEFAULT_PROFILE.nodes.map(n=>({...n,crowd:Math.round(n.crowd*.72),fill:Math.max(12,n.fill-8)}))};
+
+/* The engine runs on the server (engine.js). This page only sends the profile and draws the answer. */
+
+
+/* ======================= UI ======================= */
+const $=id=>document.getElementById(id);
+const fmt=n=>Math.round(n).toLocaleString("en-IN");
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmtMin=m=>!isFinite(m)?"—":m<1?"now":m<60?Math.round(m)+" min":(Math.round(m%60)?Math.floor(m/60)+"h "+Math.round(m%60)+"m":Math.floor(m/60)+"h");
+const ST={ok:"Safe",watch:"Watch",over:"Over limit",critical:"Critical",closed:"Closed"};
+const WST={ok:"OK",watch:"Fills soon",critical:"Urgent",closed:"Closed"};
+let profile=structuredClone(DEFAULT_PROFILE),closed=new Set(),view="crowd",selected=null,dirFilter="crowd",R=null,REPORTS={};
+
+function toast(m){const t=$("toast");t.textContent=m;t.classList.add("show");clearTimeout(toast.t);toast.t=setTimeout(()=>t.classList.remove("show"),2200)}
+const nm=id=>R.by[id]?R.by[id].name:id;
+
+async function api(url,body,method){
+  const r=await fetch(url,{method:method||(body?"POST":"GET"),headers:{"Content-Type":"application/json"},body:body?JSON.stringify(body):undefined});
+  if(r.status===401){location.href="/login";throw Error("Signed out")}
+  const j=JSON.parse(await r.text(),(k,v)=>v==="__INF__"?Infinity:v);if(!r.ok)throw Error(j.error||"Request failed");return j}
+let seq=0;
+async function update(){
+  profile.threshold=Number($("thr").value)/100;
+  const my=++seq;let out;
+  try{out=await api("/api/plan",{profile,closed:[...closed]})}catch(e){toast(e.message);return}
+  if(my!==seq)return;
+  R=out.result;REPORTS=out.reports;R.by=Object.fromEntries(R.nodes.map(n=>[n.id,n]));
+  const s=R.summary;
+  $("thrVal").textContent=Math.round(profile.threshold*100)+"%";
+  fillNodes();renderBanner();renderMetrics();renderMap();renderDetail();renderHeadroom();renderFleet();renderDirectives();renderVolunteers();renderLocations();
+  const sg=0;
+  const payload={schema:"foe.dispatch/3",payload_id:"FOE-"+hash(JSON.stringify(R.directives)+JSON.stringify(REPORTS)+profile.threshold+[...closed].join()),profile:profile.name,
+    reports:REPORTS,safe_limit:profile.threshold,closed_locations:[...closed],generated_at:new Date().toISOString(),
+    summary:{people_total:s.people_total,people_rerouted:s.people_rerouted,people_unresolved:s.people_unresolved,over_limit_before:s.over_before,over_limit_after:s.over_after,trucks_dispatched:s.trucks_dispatched,trucks_at_risk:s.trucks_at_risk,people_conserved:s.people_conserved},
+    volunteers:R.volunteers.rows.map(w=>({node:w.node,need:w.need,assigned:w.have})),directives:R.directives.map((d,i)=>({seq:i+1,...d}))};
+  $("outJson").value=JSON.stringify(payload,null,2);
+}
+function hash(s){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}return (h>>>0).toString(16).toUpperCase().padStart(8,"0")}
+
+function renderBanner(){
+  const s=R.summary,b=$("banner");let c="ok",ic="✓",t,d;
+  const esc_=R.directives.filter(x=>x.type==="ESCALATE");
+  if(esc_.length){c=s.headroom<=0?"critical":"over";ic="!";
+    t=s.headroom<=0?"Network saturated: diversion cannot solve this":`${fmt(s.people_unresolved)} people cannot be placed safely`;
+    d=s.headroom<=0?`Demand of ${fmt(s.load_open)} exceeds the ${fmt(s.safe_capacity_open)} safe capacity of open locations. Meter entry or add capacity.`:`Nearby links or spare capacity run out. Escalate ${esc_.length} location${esc_.length>1?"s":""} to the ward control room.`}
+  else if(s.people_rerouted>0){c="watch";ic="↹";t=`${R.directives.filter(x=>x.type==="CROWD_DIVERT").length} diversion${R.directives.filter(x=>x.type==="CROWD_DIVERT").length>1?"s":""} move ${fmt(s.people_rerouted)} people and clear all alerts`;d=`All locations return to within the ${Math.round(profile.threshold*100)}% safe limit once the plan is followed.`}
+  else{t="All open locations are within the safe limit";d="No diversions needed at this crowd level."}
+  b.className="banner s-"+c;
+  const wc=s.trucks_at_risk>0?"over":s.trucks_dispatched>0?"watch":"ok";
+  const wt=s.trucks_dispatched+s.trucks_at_risk===0?"No dispatch needed":s.trucks_at_risk>0?`${s.trucks_at_risk} at risk`:`${s.trucks_on_time} on time`;
+  b.innerHTML=`<div class="b-main"><div class="b-ic">${ic}</div><div><div class="b-t">${t}</div><div class="b-d">${d}</div></div></div>
+  <div class="b-chips"><span class="status-chip s-${esc_.length?"over":s.people_rerouted?"watch":"ok"}"><i></i>Crowd: ${esc_.length?"needs action":s.people_rerouted?"rerouting":"stable"}</span><span class="status-chip s-${wc}"><i></i>Waste: ${wt}</span></div>`;
+}
+function renderMetrics(){
+  const s=R.summary;
+  const cards=[
+   {c:"var(--accent)",l:"People on corridor",v:fmt(s.people_total),f:`${s.open_nodes} open · ${s.closed_nodes} closed${s.closed_nodes&&R.nodes.some(n=>n.stranded)?" · <b>"+fmt(R.nodes.reduce((a,n)=>a+n.stranded,0))+" still in closed sites</b>":""}`},
+   {c:s.over_after?"var(--over)":s.over_before?"var(--watch)":"var(--ok)",l:"Locations over safe limit",v:`${s.over_before} <small>→ ${s.over_after}</small>`,f:`before → after plan (limit ${Math.round(profile.threshold*100)}%)`},
+   {c:s.people_unresolved?"var(--over)":"var(--info)",l:"People rerouted",v:fmt(s.people_rerouted),f:s.people_unresolved?`<b>${fmt(s.people_unresolved)} unresolved</b> · escalate`:"All placed within safe limits"},
+   {c:s.trucks_at_risk?"var(--over)":"var(--ok)",l:"Waste trucks dispatched",v:s.trucks_dispatched,f:`${s.trucks_on_time} on time · ${s.trucks_at_risk} at risk${s.overflow_kg?` · ~${fmt(s.overflow_kg)} kg overflow`:""}`}];
+  $("metrics").innerHTML=cards.map(m=>`<article class="metric" style="--c:${m.c}"><div class="m-l">${m.l}</div><div class="m-v">${m.v}</div><div class="m-f">${m.f}</div></article>`).join("");
+}
+
+/* ---------- map ---------- */
+const TRUCK_COLORS=["#1fa5c0","#d6409f","#d98300","#6a5cf0","#2e9e5b"];
+function arcDash(p,r){const C=2*Math.PI*r;return `${C*Math.max(0,Math.min(1,p))} ${C}`}
+function pillSvg(x,y,txt,color){const w=txt.length*7.2+20;
+  return `<g transform="translate(${x.toFixed(1)},${y.toFixed(1)})"><rect class="pillbg" style="stroke:${color}" x="${-w/2}" y="-12" width="${w}" height="24" rx="12"/><text class="pilltxt" style="fill:${color}" y="4.5">${txt}</text></g>`}
+function arrowHead(x,y,ux,uy,color){const nx=-uy,ny=ux;
+  return `<polygon style="fill:${color}" points="${x+ux*11},${y+uy*11} ${x-ux*4+nx*8},${y-uy*4+ny*8} ${x-ux*4-nx*8},${y-uy*4-ny*8}"/>`}
+function lbl(n,k,R1,MASK,name,sub){
+  const g={b:[n.x,n.y+R1+27,n.y+R1+44,"middle"],t:[n.x,n.y-R1-31,n.y-R1-14,"middle"],r:[n.x+MASK+6,n.y-2,n.y+15,"start"],l:[n.x-MASK-6,n.y-2,n.y+15,"end"]}[k];
+  return `<text class="nm" style="text-anchor:${g[3]}" x="${g[0]}" y="${g[1]}">${name}</text><text class="sub" style="text-anchor:${g[3]}" x="${g[0]}" y="${g[2]}">${sub}</text>`}
+function renderMap(){
+  const svg=$("network"),by=R.by,thr=profile.threshold,W=view==="waste";
+  const xs=R.nodes.map(n=>n.x),ys=R.nodes.map(n=>n.y);
+  const x0=Math.min(...xs)-150,x1=Math.max(...xs)+150,y0=Math.min(...ys)-100,y1=Math.max(...ys)+100;
+  svg.setAttribute("viewBox",`${x0} ${y0} ${x1-x0} ${y1-y0}`);
+  const R1=34,SW=9,CORE=26,MASK=48;
+  let base="",flows="",pills="";
+  for(const [a,b] of profile.edges){const A=by[a],B=by[b],blocked=A.closed||B.closed;
+    base+=`<line class="edge${blocked?" blocked":""}" x1="${A.x}" y1="${A.y}" x2="${B.x}" y2="${B.y}"/>`}
+  if(!W){
+    const maxF=Math.max(1,...R.edgeFlows.map(f=>f.people));
+    for(const f of R.edgeFlows){
+      const A=by[f.from],B=by[f.to],dx=B.x-A.x,dy=B.y-A.y,len=Math.hypot(dx,dy),ux=dx/len,uy=dy/len,nx=-uy,ny=ux;
+      const opp=R.edgeFlows.some(o=>o.from===f.to&&o.to===f.from),off=opp?8:0;
+      const sx=A.x+ux*(MASK+4)+nx*off,sy=A.y+uy*(MASK+4)+ny*off,ex=B.x-ux*(MASK+12)+nx*off,ey=B.y-uy*(MASK+12)+ny*off;
+      const col=f.evac?"var(--closed)":"var(--accent)",w=(2.5+f.people/maxF*4).toFixed(1);
+      flows+=`<line class="flow${f.evac?" evac":""}" style="stroke-width:${w}px" x1="${sx}" y1="${sy}" x2="${ex}" y2="${ey}"/>`+arrowHead(ex,ey,ux,uy,col);
+      pills+=pillSvg((sx+ex)/2,(sy+ey)/2,(f.evac?"evacuate ":"")+fmt(f.people),col);
+    }
+  }else{
+    const tIdx=Object.fromEntries(R.trucks.map((t,i)=>[t.id,i]));
+    const legs=R.directives.filter(d=>d.type==="SWM_DISPATCH"&&d.route.length>1&&(d.leg===1||d.to===selected));
+    for(const d of legs){
+      const ti=tIdx[d.truck],col=TRUCK_COLORS[ti%TRUCK_COLORS.length],o=(ti%3-1)*7,pts=d.route.map(id=>({x:by[id].x+o,y:by[id].y+o}));
+      flows+=`<polyline class="truckroute" style="stroke:${col}" points="${pts.map(p=>p.x+","+p.y).join(" ")}"/>`;
+      const a=pts[pts.length-2],b=pts[pts.length-1],dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy),ux=dx/len,uy=dy/len;
+      flows+=arrowHead(b.x-ux*(MASK+12),b.y-uy*(MASK+12),ux,uy,col);
+      {const f=.5+(ti%3-1)*.2;pills+=pillSvg(a.x+(b.x-a.x)*f,a.y+(b.y-a.y)*f,`${d.truck} · ${d.eta_min} min`,col)}
+    }
+  }
+  /* put each label on the side of its node that is furthest from the links */
+  const ang={};R.nodes.forEach(n=>ang[n.id]=[]);
+  for(const [a,b] of profile.edges){const A=by[a],B=by[b],t=Math.atan2(B.y-A.y,B.x-A.x)*180/Math.PI;ang[a].push(t);ang[b].push(t+180)}
+  const angd=(a,b)=>{const d=Math.abs(a-b)%360;return d>180?360-d:d};
+  const place=n=>{let best=null;for(const [k,a] of [["b",90],["t",-90],["r",0],["l",180]]){const m=Math.min(180,...ang[n.id].map(t=>angd(t,a)));if(m>=45)return k;if(!best||m>best.m)best={k,m}}return best.k};
+  let nodes="";
+  for(const n of R.nodes){
+    const c=W?n.wst:n.st,isSel=selected===n.id;
+    let p,pct,l2;
+    if(W){p=n.fill/100;pct=n.closed?"×":Math.round(n.fill)+"%";
+      l2=n.closed?"Closed":n.fullIn<R.win?"bins full in "+fmtMin(n.fullIn):"bins OK for "+fmtMin(R.win)+"+"}
+    else{p=n.ratio;pct=n.closed?"×":(n.over&&Math.round(n.ratio*100)<=Math.round(thr*100)?(n.ratio*100).toFixed(1):Math.round(n.ratio*100))+"%";
+      l2=n.closed?(n.load?`Closed · ${fmt(n.load)} stuck`:`Closed · ${fmt(n.evacuated)} moved out`):(n.raw!==n.load?`${fmt(n.raw)} → ${fmt(n.load)}`:`${fmt(n.load)} people`)}
+    const ang=(thr*360-90)*Math.PI/180,tx1=n.x+Math.cos(ang)*(R1-8),ty1=n.y+Math.sin(ang)*(R1-8),tx2=n.x+Math.cos(ang)*(R1+8),ty2=n.y+Math.sin(ang)*(R1+8);
+    let badge="";
+    if(W&&n.truck){const ok=n.truck.type==="SWM_DISPATCH"&&n.truck.on_time;badge=`<g transform="translate(${n.x+30},${n.y-30})" class="s-${ok?"ok":"over"}"><circle class="badge" r="10"/><text class="badge-t" y="4">${ok?"✓":"!"}</text></g>`}
+    if(!W&&n.closed)badge=`<g transform="translate(${n.x+30},${n.y-30})" class="s-closed"><circle class="badge" r="10"/><text class="badge-t" y="4">×</text></g>`;
+    nodes+=`<g class="node s-${c}" data-act="select" data-id="${esc(n.id)}" tabindex="0" role="button" aria-label="${esc(n.name)}, ${esc(l2)}">
+      <circle class="mask" cx="${n.x}" cy="${n.y}" r="${MASK}"/>
+      ${isSel?`<circle class="sel" cx="${n.x}" cy="${n.y}" r="${MASK+3}"/>`:""}
+      <circle class="track" cx="${n.x}" cy="${n.y}" r="${R1}"/>
+      <circle class="after" cx="${n.x}" cy="${n.y}" r="${R1}" transform="rotate(-90 ${n.x} ${n.y})" stroke-dasharray="${arcDash(p,R1)}"/>
+      ${W||n.closed?"":`<line class="tick" x1="${tx1}" y1="${ty1}" x2="${tx2}" y2="${ty2}"/>`}
+      <circle class="core" cx="${n.x}" cy="${n.y}" r="${CORE}"/>
+      <text class="pct" x="${n.x}" y="${n.y+5}">${pct}</text>
+      ${lbl(n,place(n),R1,MASK,esc(n.name),esc(l2))}${badge}</g>`;
+  }
+  let tags="";
+  if(W){const cnt={};R.trucks.forEach((t,i)=>{const n=by[t.at],k=cnt[t.at]=(cnt[t.at]||0)+1,col=TRUCK_COLORS[i%TRUCK_COLORS.length];
+    tags+=`<g transform="translate(${n.x-32-(k-1)*22},${n.y-30})"><circle r="10" style="fill:${col};stroke:var(--mapbg);stroke-width:2"/><text class="badge-t" y="4">${i+1}</text></g>`})}
+  svg.innerHTML=`<defs><pattern id="grid" width="28" height="28" patternUnits="userSpaceOnUse"><path d="M28 0H0V28" fill="none" stroke="currentColor" stroke-width=".6" opacity=".08"/></pattern></defs><rect x="${x0}" y="${y0}" width="${x1-x0}" height="${y1-y0}" fill="url(#grid)" pointer-events="none"/>${base}${flows}${pills}${nodes}${tags}`;
+  $("mapTitle").textContent=W?"Waste levels & collection":"Crowd flow & safe capacity";
+  $("mapSub").textContent=W?`Ring = how full the bins are now; the label says when they fill at the current crowd. Numbered dots show where each truck starts.`:"Ring = load vs capacity after the plan. Black tick = safe limit. Links at closed sites are static and dotted.";
+  $("mapStatus").textContent=`${R.nodes.length} locations · ${profile.edges.length} links · ${closed.size} closed`;
+  $("legend").innerHTML=W?
+   `<span class="s-ok"><i></i>Fills slowly</span><span class="s-watch"><i></i>Full within ${fmtMin(R.win)}</span><span class="s-critical"><i></i>Full in &lt; 45 min</span><span>✓ on time · ! at risk</span>`+R.trucks.map((t,i)=>`<span><i style="background:${TRUCK_COLORS[i%TRUCK_COLORS.length]}"></i>${i+1} ${esc(t.id)}</span>`).join(""):
+   `<span class="s-ok"><i></i>Safe</span><span class="s-watch"><i></i>Near limit</span><span class="s-over"><i></i>Over limit</span><span class="s-critical"><i></i>Over capacity</span><span class="s-closed"><i></i>Closed</span><span><i class="bar"></i>Moving (animated)</span><span><i class="bar grey"></i>Evacuation from closed site (static)</span>`;
+}
+function renderFleet(){
+  const un=R.directives.filter(d=>d.type==="SWM_UNSERVED");
+  $("fleet").innerHTML=R.trucks.map((t,i)=>{
+    const col=TRUCK_COLORS[i%TRUCK_COLORS.length],legs=R.directives.filter(d=>d.type==="SWM_DISPATCH"&&d.truck===t.id);
+    return `<div class="fleet-t"><div class="fleet-h"><i style="background:${col}">${i+1}</i><b>${esc(t.id)}</b><span class="muted">starts at ${esc(nm(t.at))}</span></div>`+
+    (legs.length?legs.map(d=>`<div class="leg"><span class="muted">Stop ${d.leg}</span><span><b>${esc(nm(d.to))}</b></span><span class="muted nowrap">at ${d.eta_min} min</span><span class="badge s-${d.on_time?"ok":"over"}">${d.on_time?"On time":"Late "+d.late_min+" min"}</span></div>`).join(""):`<div class="leg muted">Standby: no stop needed</div>`)+`</div>`}).join("")+
+    (un.length?`<div class="fleet-t"><div class="fleet-h"><i style="background:var(--over)">!</i><b>Unserved</b></div>`+un.map(d=>`<div class="leg"><span><b>${esc(nm(d.to))}</b></span><span class="muted">bins full in ${fmtMin(d.bins_full_in_min)}</span><span class="badge s-over">No truck can reach</span></div>`).join("")+`</div>`:"");
+}
+
+/* ---------- side cards ---------- */
+function renderDetail(){
+  const el=$("detail"),n=selected&&R.by[selected];
+  if(!n){const top=[...R.nodes].filter(x=>!x.closed).sort((a,b)=>view==="waste"?a.fullIn-b.fullIn:b.ratio0-a.ratio0).slice(0,3);
+    el.innerHTML=`<p class="hint">${view==="waste"?"Bins closest to full right now:":"Highest-pressure locations right now:"}</p>`+top.map(x=>`<button class="hot s-${view==="waste"?x.wst:x.st0}" data-act="select" data-id="${esc(x.id)}"><span><b>${esc(x.name)}</b><br><span class="muted" style="font-size:11.5px">${view==="waste"?(isFinite(x.fullIn)?"Bins full in "+fmtMin(x.fullIn):"No waste inflow"):fmt(x.raw)+" people · "+Math.round(x.ratio0*100)+"% of capacity"}</span></span><span class="badge">${view==="waste"?WST[x.wst]:ST[x.st0]}</span></button>`).join("");return}
+  const inb=R.directives.filter(d=>d.type==="CROWD_DIVERT"&&d.to===n.id),outb=R.directives.filter(d=>d.type==="CROWD_DIVERT"&&d.from===n.id);
+  const pct=Math.min(100,n.ratio*100),t=n.truck;
+  el.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><div><div style="font-weight:800;font-size:16px">${esc(n.name)}</div><div class="muted" style="font-size:12px">Ward ${esc(n.ward)} · capacity ${fmt(n.cap)}</div></div><span class="badge s-${n.st}">${ST[n.st]}</span></div>
+  <div class="meter s-${n.st}"><div class="fill" style="width:${pct}%"></div><div class="thr" style="left:${profile.threshold*100}%"></div></div>
+  <div class="kv" style="margin-top:12px"><span>Crowd now</span><b>${fmt(n.raw)} (${Math.round(n.ratio0*100)}%)</b><span>After plan</span><b>${fmt(n.load)} (${Math.round(n.ratio*100)}%)</b><span>Safe limit</span><b>${fmt(Math.floor(n.cap*profile.threshold))}</b>
+  <span>Sending out</span><b>${fmt(outb.reduce((s,d)=>s+d.people,0))}</b><span>Receiving</span><b>${fmt(inb.reduce((s,d)=>s+d.people,0))}</b>
+  <span>Bins filled</span><b>${Math.round(n.fill)}% of ${fmt(n.binCap)} kg</b><span>Waste inflow</span><b>${fmt(n.rate)} kg/h</b><span>Bins full in</span><b>${fmtMin(n.fullIn)}</b>
+  <span>Truck</span><b>${t?(t.type==="SWM_DISPATCH"?`${t.truck} · ETA ${t.eta_min} min ${t.on_time?"✓":"(late "+t.late_min+")"}`:"None can reach"):"Not needed"}</b></div>
+  <div class="row-actions"><button class="btn ${n.closed?"primary":"danger"}" data-act="close" data-id="${esc(n.id)}">${n.closed?"Reopen location":"Close location"}</button><button class="btn" data-act="select" data-id="">Clear</button></div>`;
+}
+function renderHeadroom(){
+  const s=R.summary,u=s.safe_capacity_open?s.load_open/s.safe_capacity_open:0,c=u>1?"critical":u>.9?"over":u>.75?"watch":"ok";
+  $("headroom").innerHTML=`<div class="meter s-${c}"><div class="fill" style="width:${Math.min(100,u*100)}%"></div></div>
+  <div class="kv" style="margin-top:10px"><span>Demand (all locations)</span><b>${fmt(s.demand_total)}</b><span>Safe capacity (open)</span><b>${fmt(s.safe_capacity_open)}</b><span>Used after plan</span><b>${Math.round(u*100)}%</b><span>Spare room left</span><b>${fmt(s.headroom)}</b><span>People conserved</span><b style="color:var(--${s.people_conserved?"ok":"over"})">${s.people_conserved?"✓ yes":"✗ check"}</b></div>
+  <div class="note"><b>How routing works:</b> the engine solves the whole corridor at once as a min-cost max-flow: closed sites are evacuated first, then over-limit sites, using the shortest routes that fit each link's throughput limit. Closed sites never receive people or act as a route, and their links stop moving. Anything that cannot be placed is escalated.</div>`;
+}
+
+/* ---------- tables ---------- */
+function renderDirectives(){
+  const list=R.directives.filter(d=>dirFilter==="all"||(dirFilter==="crowd"?(d.type==="CROWD_DIVERT"||d.type==="ESCALATE"):d.type.startsWith("SWM")));
+  $("dirSub").textContent=`${list.length} action${list.length===1?"":"s"} · generated from the current scenario`;
+  document.querySelectorAll("#dirTabs button").forEach(b=>b.classList.toggle("active",b.dataset.f===dirFilter));
+  if(!list.length){$("dirRows").innerHTML=`<tr><td colspan="7" class="empty">No actions needed for this scenario.</td></tr>`;return}
+  $("dirRows").innerHTML=list.map((d,i)=>{
+    const k=`<td class="muted">${i+1}</td>`;
+    if(d.type==="CROWD_DIVERT")return `<tr class="row">${k}<td><span class="type s-info" style="--c:var(--accent)">Crowd diversion</span></td><td><span class="code">${esc(d.from)} → ${esc(d.to)}</span> <span class="muted">${esc(nm(d.from))} → ${esc(nm(d.to))}</span></td><td><b>Move ${fmt(d.people)} people</b>${d.goal?`<br><span class="muted">heading to ${esc(nm(d.goal))}</span>`:""}</td><td>${d.via.length?"via "+d.via.map(v=>esc(nm(v))).join(", "):"Direct link"} <span class="muted">· ${d.hops} hop${d.hops>1?"s":""}</span></td><td class="nowrap">${esc(d.ward)} → ${esc(d.to_ward)}</td><td><span class="badge s-ok">Suggested</span></td></tr>`;
+    if(d.type==="ESCALATE")return `<tr class="row">${k}<td><span class="type s-over">Escalate</span></td><td><span class="code">${esc(d.node)}</span> <span class="muted">${esc(nm(d.node))}</span></td><td><b>${fmt(d.unresolved)} people cannot be placed</b>${d.closed?" <span class='muted'>(closed site)</span>":""}</td><td>${esc(d.reason)}</td><td>${esc(d.ward)}</td><td><span class="badge s-over">Action needed</span></td></tr>`;
+    if(d.type==="SWM_DISPATCH")return `<tr class="row">${k}<td><span class="type s-ok" style="--c:var(--info)">Waste truck</span></td><td><span class="code">${esc(d.truck)} → ${esc(d.to)}</span> <span class="muted">${esc(nm(d.to))}</span></td><td><b>Dispatch, arrive in ${d.eta_min} min</b></td><td>${d.route.map(v=>esc(nm(v))).join(" → ")} <span class="muted">· bins full in ${fmtMin(d.bins_full_in_min)}</span></td><td>${esc(d.ward)}</td><td>${d.on_time?`<span class="badge s-ok">On time</span>`:`<span class="badge s-over">Late ${d.late_min} min · ~${fmt(d.overflow_kg)} kg overflow</span>`}</td></tr>`;
+    return `<tr class="row">${k}<td><span class="type s-over">Waste truck</span></td><td><span class="code">${esc(d.to)}</span> <span class="muted">${esc(nm(d.to))}</span></td><td><b>No truck can reach</b></td><td>Bins full in ${fmtMin(d.bins_full_in_min)}</td><td>${esc(d.ward)}</td><td><span class="badge s-over">Unserved</span></td></tr>`}).join("");
+}
+function renderLocations(){
+  const thr=profile.threshold;
+  $("locRows").innerHTML=R.nodes.map(n=>{const pct=Math.min(100,n.ratio*100);
+    return `<tr class="row ${selected===n.id?"sel":""}" data-act="select" data-id="${esc(n.id)}" style="cursor:pointer"><td><b>${esc(n.name)}</b><br><span class="muted" style="font-size:11.5px">${esc(n.id)} · Ward ${esc(n.ward)}</span></td>
+    <td>${fmt(n.raw)}<br><span class="muted" style="font-size:11.5px">${Math.round(n.ratio0*100)}%</span></td>
+    <td><b>${fmt(n.load)}</b><br><span class="muted" style="font-size:11.5px">${Math.round(n.ratio*100)}%${n.raw!==n.load?" ("+(n.load>n.raw?"+":"")+fmt(n.load-n.raw)+")":""}</span></td>
+    <td><div class="meter mini s-${n.st}"><div class="fill" style="width:${pct}%"></div><div class="thr" style="left:${thr*100}%"></div></div></td>
+    <td><span class="badge s-${n.st}">${ST[n.st]}</span></td>
+    <td>${Math.round(n.fill)}%</td><td><span class="badge s-${n.wst}">${n.closed?"Closed":isFinite(n.fullIn)?fmtMin(n.fullIn):"No inflow"}</span></td>
+    <td><button class="btn ${n.closed?"primary":""}" data-act="close" data-id="${esc(n.id)}">${n.closed?"Reopen":"Close"}</button></td></tr>`}).join("");
+}
+
+/* ---------- actions ---------- */
+function toggleClose(id){if(closed.has(id)){closed.delete(id);toast(nm(id)+" reopened")}else{closed.add(id);toast(nm(id)+" closed · crowd evacuated to open locations")}update()}
+document.addEventListener("click",e=>{const t=e.target.closest("[data-act]");if(!t)return;const id=t.dataset.id;
+  if(t.dataset.act==="select"){if(e.target.closest("button[data-act=close]"))return;selected=id||null;update()}
+  else if(t.dataset.act==="close"){e.stopPropagation();toggleClose(id)}});
+document.addEventListener("keydown",e=>{if((e.key==="Enter"||e.key===" ")&&e.target.classList&&e.target.classList.contains("node")){e.preventDefault();selected=e.target.dataset.id;update()}});
+let raf=0;const sched=()=>{cancelAnimationFrame(raf);raf=requestAnimationFrame(update)};
+$("thr").addEventListener("input",sched);
+function fillNodes(){const s=$("repNode");if(s.dataset.p!==profile.name+R.nodes.length){s.dataset.p=profile.name+R.nodes.length;s.innerHTML=R.nodes.map(n=>`<option value="${esc(n.id)}">${esc(n.name)}</option>`).join("")}
+  const v=Object.keys(REPORTS).length;$("repAge").innerHTML=v?`<small>${v} location${v>1?"s":""} reported</small>`:"<small>using baseline</small>"}
+const VR={police:"Police",medic:"Medics",crowd_control:"Crowd control"};
+function renderVolunteers(){const V=R.volunteers,ks=Object.keys(VR),sh=ks.filter(k=>V.short[k]);
+  $("volSub").textContent=`Pool: ${ks.map(k=>V.pool[k]+" "+VR[k].toLowerCase()).join(" · ")} · ${sh.length?"shortfall: "+sh.map(k=>V.short[k]+" "+VR[k].toLowerCase()).join(", "):"fully covered"} · busiest locations staffed first`;
+  $("volRows").innerHTML=V.rows.map(w=>`<tr class="row"><td><b>${esc(w.name)}</b><br><span class="muted" style="font-size:11.5px">${fmt(w.load)} people${w.change?" ("+(w.change>0?"+":"")+fmt(w.change)+" vs baseline)":""}</span></td>`+ks.map(k=>`<td><span class="badge s-${w.have[k]<w.need[k]?"over":"ok"}">${w.have[k]} / ${w.need[k]}</span></td>`).join("")+`<td><span class="badge s-${w.status}">${ST[w.status]}</span></td></tr>`).join("")}
+async function sendReports(list,msg){try{await api("/api/reports",{reports:list});toast(msg);update()}catch(e){toast(e.message)}}
+$("repBtn").onclick=()=>{const c=$("repCount").value;if(c==="")return toast("Enter a headcount");sendReports([{node:$("repNode").value,count:Math.round(Number(c))}],"Report received · plan recalculated")};
+$("simBtn").onclick=()=>sendReports(R.nodes.map(n=>({node:n.id,count:Math.round(n.base*(.8+Math.random()*.9)/50)*50})),"Demo reports received · plan recalculated");
+$("clearRep").onclick=async()=>{try{await api("/api/reports",null,"DELETE");toast("Reports cleared · back to baseline");update()}catch(e){toast(e.message)}};
+$("logoutBtn").onclick=async()=>{await fetch("/api/logout",{method:"POST"});location.href="/login"};
+function setView(v){view=v;$("vCrowd").classList.toggle("active",v==="crowd");$("vWaste").classList.toggle("active",v==="waste");dirFilter=v;update()}
+$("vCrowd").onclick=()=>setView("crowd");$("vWaste").onclick=()=>setView("waste");
+$("dirTabs").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;dirFilter=b.dataset.f;renderDirectives()});
+$("resetBtn").onclick=()=>{closed.clear();selected=null;$("thr").value=Math.round((profile.name===COMPACT_PROFILE.name?COMPACT_PROFILE:DEFAULT_PROFILE).threshold*100);update();toast("Scenario reset")};
+$("themeBtn").onclick=()=>{const r=document.documentElement,dark=r.dataset.theme?r.dataset.theme==="dark":matchMedia("(prefers-color-scheme:dark)").matches;r.dataset.theme=dark?"light":"dark"};
+function loadProfile(p,label){profile=structuredClone(p);closed.clear();selected=null;$("thr").value=Math.round(profile.threshold*100);$("profJson").value=JSON.stringify(profile,null,2);$("profileSelect").value=label;update()}
+$("profileSelect").onchange=e=>loadProfile(e.target.value==="compact"?COMPACT_PROFILE:DEFAULT_PROFILE,e.target.value);
+function validateProfile(p){
+  if(!p||!Array.isArray(p.nodes)||!Array.isArray(p.edges)||!Array.isArray(p.trucks)||typeof p.threshold!=="number"||!p.nodes.length)throw Error("Profile needs numeric threshold plus nodes, edges and trucks.");
+  const ids=new Set(p.nodes.map(n=>n.id));if(ids.size!==p.nodes.length)throw Error("Node IDs must be unique.");
+  for(const n of p.nodes){if(!n.id||!n.name||!(n.cap>0)||!Number.isFinite(n.crowd)||!Number.isFinite(n.x)||!Number.isFinite(n.y))throw Error("Each node needs id, name, cap>0, crowd, x and y.");
+    if(!(n.bins>=0)||!(n.binKg>=0)||!Number.isFinite(n.fill)||!(n.dwell>0))throw Error(`Node ${n.id} needs bins, binKg, fill and dwell>0.`)}
+  for(const e of p.edges){if(!Array.isArray(e)||e.length<2||e.length>3||!ids.has(e[0])||!ids.has(e[1]))throw Error("Every edge must connect two existing node IDs.")}
+  for(const t of p.trucks){if(!ids.has(t.at))throw Error(`Truck ${t.id||"(unnamed)"} references unknown node ${t.at}.`)}
+  if(p.threshold<=0||p.threshold>1)throw Error("threshold must be above 0 and at most 1.");
+}
+$("applyProf").onclick=()=>{try{const p=JSON.parse($("profJson").value);validateProfile(p);loadProfile(p,"custom");$("profileSelect").querySelector("[value=custom]").hidden=false;toast("Profile applied")}catch(e){toast("Not applied: "+e.message)}};
+$("restoreProf").onclick=()=>{loadProfile(DEFAULT_PROFILE,"default");toast("Default profile restored")};
+$("copyJson").onclick=async()=>{try{await navigator.clipboard.writeText($("outJson").value);toast("JSON copied")}catch(e){$("outJson").select();toast("Press Ctrl/Cmd+C to copy")}};
+$("dlJson").onclick=()=>{const u=URL.createObjectURL(new Blob([$("outJson").value],{type:"application/json"})),a=document.createElement("a");a.href=u;a.download="foe-dispatch-output.json";a.click();URL.revokeObjectURL(u);toast("JSON exported")};
+$("profJson").value=JSON.stringify(profile,null,2);
+update();
+</script>
+</body>
+</html>
