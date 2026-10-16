@@ -1,5 +1,6 @@
 /* FOE engine (written from scratch). Pure calculation, no DOM, no network; runs on the server.
    runEngine(profile, closedSet, counts) -> result the dashboard draws; counts = latest reported headcount per location.
+   This file now also exposes judgeRequest(profile, closedSet, counts, allocatedMap, request) which returns a per-request decision.
    Pipeline: 1 prepare > 2 links > 3 divert toward destination > 4 status > 5 waste > 6 trucks > 7 volunteers > 8 summary */
 
 /* STEP 1: working nodes. raw = latest REPORTED headcount (falls back to the baseline in the profile) */
@@ -106,7 +107,9 @@ function estimateWaste(N, profile, win) {
   for (const x of N) {
     x.binCap = x.bins * x.binKg;
     x.binNow = x.binCap * x.fill / 100;
-    x.rate = x.closed ? 0 : x.load * 60 / Math.max(1, x.dwell) * wk;
+    // wk may be an object of types or a single number; use food as a reasonable baseline if object
+    const baseline = typeof wk === 'number' ? wk : (wk.food || Object.values(wk)[0] || 0.06);
+    x.rate = x.closed ? 0 : x.load * 60 / Math.max(1, x.dwell) * baseline;
     const room = Math.max(0, x.binCap - x.binNow);
     x.fullIn = x.rate > 0 ? room / x.rate * 60 : Infinity;                          /* minutes */
     x.proj = x.binCap > 0 ? (x.binNow + x.rate * win / 60) / x.binCap : 0;
@@ -197,4 +200,65 @@ function runEngine(profile, closedSet, counts = {}) {
   };
   return { nodes: N, by, directives, summary, edgeFlows, trucks: profile.trucks, win, volunteers };
 }
-module.exports = { runEngine };
+
+/* New: judgeRequest(profile, closedSet, counts, allocatedMap, request)
+   - allocatedMap: { node|slot: number } current already-allocated people at nodes per slot (slot may be 'NOW' for immediate)
+   - request: { id, requesterType: 'citizen'|'volunteer', size: number, preferredSites: [id,...], preferredSlots: [slotIndex,...] }
+   Returns: { status: 'Allocated'|'Diverted'|'Rejected', node: id|null, slot: slotIndex|null, reason }
+*/
+function judgeRequest(profile, closedSet, counts = {}, allocatedMap = {}, request = {}){
+  // Build current loads per node (these are "now" loads independent of slots)
+  const N = prepareNodes(profile, closedSet, counts);
+  const by = Object.fromEntries(N.map(x=>[x.id,x]));
+  // compute available now at each node
+  const availableNow = {}; for(const id in by) availableNow[id] = Math.max(0, by[id].safe - by[id].load);
+  // timeslot handling
+  const slotMinutes = profile.timeslotMinutes || 15;
+  const nowSlot = Math.floor(Date.now() / (slotMinutes*60000));
+  const prefSites = Array.isArray(request.preferredSites)&&request.preferredSites.length?request.preferredSites:[];
+  const prefSlots = Array.isArray(request.preferredSlots)&&request.preferredSlots.length?request.preferredSlots:[];
+  const relax = request.requesterType==='volunteer'?1.05:1.0;
+  const horizonSlots = 48; // check next 48 slots (~12 hours for 15min)
+
+  // helper to check capacity for a node at a given slotIndex
+  const capacityAt = (nodeId, slotIndex)=>{
+    const node = by[nodeId]; if(!node || node.closed) return 0;
+    const baseLoad = node.load; // current load influences all slots
+    // sum allocations for that node at that slot
+    const key = nodeId+'|'+String(slotIndex);
+    const allocHere = allocatedMap[key]||0;
+    const avail = Math.max(0, node.safe - (baseLoad + allocHere));
+    return avail;
+  };
+
+  // If preferred slots provided, check those first
+  if(prefSlots.length){
+    for(const slot of prefSlots){
+      for(const p of prefSites){
+        if(capacityAt(p,slot) >= Math.ceil(request.size/relax)) return {status:'Allocated',node:p,slot,reason:'Preferred site/slot has room'};
+      }
+    }
+  }
+  // try preferred sites for ASAP allocation (search upcoming slots)
+  const sitesToTry = prefSites.length?prefSites:Object.keys(by).filter(id=>!by[id].closed);
+  for(let offset=0; offset<horizonSlots; offset++){
+    const sIdx = nowSlot+offset;
+    for(const nodeId of sitesToTry){
+      if(capacityAt(nodeId,sIdx) >= request.size) return {status:'Allocated',node:nodeId,slot:sIdx,reason: offset===0? 'Allocated now':'Allocated future slot'};
+    }
+  }
+  // if no preferred sites or failed, search all nodes by nearest-to-pref or by safe capacity
+  const { adj } = buildLinks(profile, by);
+  // BFS distance from preferred sites (or treat all equally)
+  const q=[]; const seen=new Set();
+  if(prefSites.length){ for(const p of prefSites){ if(by[p] && !by[p].closed){ q.push(p); seen.add(p);} } }
+  else { for(const id in by) if(!by[id].closed){ q.push(id); seen.add(id);} }
+  const dist={}; let head=0;
+  while(head<q.length){ const u=q[head++]; for(const v of adj[u]||[]) if(!seen.has(v)&&!by[v].closed){ seen.add(v); dist[v]=(dist[u]||0)+1; q.push(v);} }
+  const cand = Object.keys(by).filter(id=>!by[id].closed).map(id=>({id,dist:dist[id]??99,availNow:capacityAt(id,nowSlot)})).sort((a,b)=>a.dist-b.dist||b.availNow-b.availNow);
+  for(const c of cand){ for(let offset=0; offset<horizonSlots; offset++){ const sIdx=nowSlot+offset; if(capacityAt(c.id,sIdx)>=request.size) return {status:'Diverted',node:c.id,slot:sIdx,reason:'Suggested alternative slot/node'} } }
+  // nothing found
+  return {status:'Rejected',node:null,slot:null,reason:'No capacity in network for requested group within horizon'};
+}
+
+module.exports = { runEngine, judgeRequest };
